@@ -38,7 +38,15 @@ You are a professional investment analyst. Based on the data below, write a clea
 
 Context from web search:
 """
-{context}
+try:
+    # your actual logic here, for example:
+    response = openai.chat.completions.create(
+        model="gpt-4",
+        messages=context
+    )
+except Exception as e:
+    st.error(f"An error occurred while generating the response: {e}")
+
 """
 
 Structure the report as:
