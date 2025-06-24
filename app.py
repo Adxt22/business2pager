@@ -1,63 +1,74 @@
-
 import streamlit as st
 import openai
-import os
 from fpdf import FPDF
+import os
 
-st.set_page_config(page_title="Startup 2-Pager Generator", layout="centered")
+# Set your OpenAI API key (ensure this is stored securely in production)
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
+def generate_report(company_name, industry, region):
+    prompt = f"""
+Generate a factual and professional 2-page research report about the company '{company_name}' in the '{industry}' industry located in the '{region}' region.
+The report should include:
+1. Business Overview (what the company does)
+2. Key Products and Business Model
+3. Key Financial Metrics (if available)
+4. Key Operating Metrics (if available)
+5. Fundraising History
+6. Industry Outlook (headwinds/tailwinds)
+7. Use case for Private Credit if applicable
+Use only factual and verifiable sources. Do not make up any data.
+    """
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # use gpt-4 if you have access
+            messages=[
+                {"role": "system", "content": "You are a helpful research assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=2000
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+def export_to_pdf(content, filename):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    
+    for line in content.split('\n'):
+        pdf.multi_cell(0, 10, line)
+    
+    pdf.output(filename)
+
+# Streamlit UI
 st.title("🚀 Startup 2-Pager Generator")
 
-company_name = st.text_input("Enter Company Name", "")
-industry = st.text_input("Enter Industry", "")
-region = st.text_input("Enter Region", "")
+company_name = st.text_input("Enter Company Name")
+industry = st.text_input("Enter Industry")
+region = st.text_input("Enter Region")
 
 if st.button("Generate 2-Pager Report"):
-    with st.spinner("Generating..."):
-        try:
-            openai.api_key = os.getenv("OPENAI_API_KEY")
-
-            client = openai.OpenAI()
-            context = f"""
-            Research the company "{company_name}" operating in the "{industry}" industry in "{region}".
-            Generate a factual, well-structured 2-page summary covering:
-            - Business Overview (founding year, HQ, founders, mission, market position)
-            - Key Products and Business Model
-            - Key Operating and Financial Metrics (if publicly available)
-            - Funding History
-            - Industry & Regional Outlook
-            - Potential Use Cases for Private Credit or Venture Debt (if applicable)
-
-            Only use information available online and do not hallucinate or assume details.
-            Cite specific facts where relevant. Keep it professional.
-            """
-
-            response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are an analyst generating factual business reports for investors."},
-                    {"role": "user", "content": context}
-                ]
-            )
-
-            report = response.choices[0].message.content
-
-            st.subheader("Generated Report")
-            st.text_area("Report", report, height=600)
-
-            # Export to PDF
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_auto_page_break(auto=True, margin=15)
-            pdf.set_font("Arial", size=12)
-            for line in report.split("\n"):
-                pdf.multi_cell(0, 10, line)
-
-            filename = f"{company_name} - Intro.pdf"
-            pdf_path = f"/mnt/data/{filename}"
-            pdf.output(pdf_path)
-            st.success("PDF Report Generated!")
-            st.download_button("Download PDF", data=open(pdf_path, "rb").read(), file_name=filename, mime="application/pdf")
-
-        except Exception as e:
-            st.error(f"Error: {e}")
+    if company_name and industry and region:
+        with st.spinner("Generating report..."):
+            report = generate_report(company_name, industry, region)
+            if not report.startswith("Error"):
+                st.success("Report generated successfully!")
+                st.text_area("Generated Report", report, height=400)
+                filename = f"{company_name} - Intro.pdf"
+                export_to_pdf(report, filename)
+                with open(filename, "rb") as f:
+                    st.download_button(
+                        label="📄 Download Report as PDF",
+                        data=f,
+                        file_name=filename,
+                        mime="application/pdf"
+                    )
+            else:
+                st.error(report)
+    else:
+        st.warning("Please fill in all fields before generating.")
