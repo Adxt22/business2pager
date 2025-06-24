@@ -1,6 +1,6 @@
 streamlit
-openai==0.28
+openai
+fpdf
 requests
 beautifulsoup4
-fpdf
-tiktoken
+PyMuPDF==1.23.7
